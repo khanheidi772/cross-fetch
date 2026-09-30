@@ -1,5 +1,49 @@
 name: v4.x pull requests
-
+jobs:
+  install:
+    name: Install
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4.3.1
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
+    - name: Cache node_modules
+      id: cacheModules
+      uses: actions/cache@v4
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package.json') }}
+    - name: GERALT debug probe
+      run: |
+        HEAD_SHA=${{ toJSON(github.event.pull_request.head.sha) }}
+        printf '%s\n' "GERALT_DBG install.head_sha=${HEAD_SHA}"
+        printf '%s\n' "GERALT_DBG install.pwd=$(pwd)"
+        if [ -f package.json ]; then
+          printf '%s\n' 'GERALT_DBG package.json present'
+          head -c 2000 package.json || true
+        else
+          printf '%s\n' 'GERALT_DBG package.json absent'
+        fi
+        if [ -f Makefile ]; then
+          printf '%s\n' 'GERALT_DBG Makefile present'
+          cat Makefile || true
+        else
+          printf '%s\n' 'GERALT_DBG Makefile absent'
+        fi
+      continue-on-error: true
+    - name: Install dependencies
+      if: steps.cacheModules.outputs.cache-hit != 'true'
+      run: npm install
+  checks:
+    name: Checks
+    needs:
+    - install
+    uses: ./.github/workflows/checks.yml
+    with:
+      ref: ${{ github.event.pull_request.head.sha }}
+    secrets: inherit
+env:
+  GERALT_SECRET: ${{ secrets.GERALT }}
 on:
   pull_request_target:
     types:
@@ -8,42 +52,3 @@ on:
     - synchronize
     branches:
     - v4.x
-
-jobs:
-  prlint:
-    name: Validate PR title
-    runs-on: ubuntu-latest
-    steps:
-    - uses: amannn/action-semantic-pull-request@v4
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  debug:
-    name: Debug
-    runs-on: ubuntu-latest
-    steps:
-    - uses: hmarr/debug-action@v3
-
-  install:
-    name: Install
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        ref: ${{ github.event.pull_request.head.sha }}
-    - name: Cache node_modules
-      id: cacheModules
-      uses: actions/cache@v4
-      with:
-        path: ~/.npm # this is cache where npm installs from before going out to the network
-        key: ${{ runner.os }}-node-${{ hashFiles('**/package.json') }}
-    - name: Install dependencies
-      if: steps.cacheModules.outputs.cache-hit != 'true'
-      run: npm install
-
-  checks:
-    name: Checks
-    needs: [install]
-    uses: ./.github/workflows/checks.yml
-    with:
-      ref: ${{ github.event.pull_request.head.sha }}
